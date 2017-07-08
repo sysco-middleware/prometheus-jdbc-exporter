@@ -3,7 +3,7 @@ jobs:
 - name: "global"
   interval: '5m'
   connections:
-  - 'postgres://postgres@localhost/postgres?sslmode=disable'
+  - 'jdbc:postgresql://docker-vm/postgres?user=postgres&password=example&useSSL=false'
   queries:
   - name: "running_queries"
     help: "Number of running queries"

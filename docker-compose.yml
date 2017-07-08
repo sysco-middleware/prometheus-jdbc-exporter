@@ -1,0 +1,19 @@
+# Use postgres/example user/password credentials
+version: '3.1'
+services:
+  db:
+    image: postgres
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: example
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+  db1:
+    image: mysql
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: example

@@ -12,6 +12,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -82,8 +83,8 @@ public class JdbcCollector extends Collector implements Collector.Describable {
         }
         if (jobObject.containsKey("connections")) {
           List<Object> connections = (List<Object>) jobObject.get("connections");
-          for (Object connection : connections) {
-            job.connections.add((String) connection);
+          for (Object connObject : connections) {
+            job.connections.add((String) connObject);
           }
         }
         if (jobObject.containsKey("queries")) {
@@ -149,16 +150,17 @@ public class JdbcCollector extends Collector implements Collector.Describable {
 
   private List<MetricFamilySamples> runJob(Job job, Map<String, String> queries) {
     return job.connections.stream().flatMap(connection -> {
-      Properties connectionProps = new Properties();
-      connectionProps.put("user", "");
-      connectionProps.put("password", "");
-
-      try (Connection conn = DriverManager.getConnection(connection, connectionProps)) {
+      /*Properties connectionProps = new Properties();
+      connectionProps.put("user", connection.username);
+      connectionProps.put("password", connection.password);
+*/
+      try {
+        java.sql.Connection conn = DriverManager.getConnection(connection);
         return job.queries.stream().flatMap(query -> {
           if (query.query != null) {
             try {
-              PreparedStatement statement = conn.prepareStatement(query.query);
-              ResultSet rs = statement.executeQuery();
+              Statement statement = conn.createStatement();
+              ResultSet rs = statement.executeQuery(query.query);
 
               return getSamples(job.name, query, rs).stream();
             } catch (SQLException e) {
@@ -246,8 +248,8 @@ public class JdbcCollector extends Collector implements Collector.Describable {
 
   static class Job {
     String name;
-    List<String> connections;
-    List<Query> queries;
+    List<String> connections = new ArrayList<>();
+    List<Query> queries = new ArrayList<>();
   }
 
   static class Query {
