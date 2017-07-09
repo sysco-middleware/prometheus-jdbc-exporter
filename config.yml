@@ -1,0 +1,28 @@
+---
+jobs:
+- name: "global"
+  interval: '5m'
+  connections:
+  - url: 'jdbc:postgresql://docker-vm/postgres?useSSL=false'
+    username: postgres
+    password: example
+  queries:
+  - name: "running_queries"
+    help: "Number of running queries"
+    labels:
+      - "datname"
+      - "usename"
+    values:
+      - "count"
+    query:  |
+            SELECT datname::text, usename::text, COUNT(*)::float AS count
+            FROM pg_stat_activity GROUP BY datname, usename;
+  - name: "db_sizes"
+    help: "Database Sizes"
+    labels:
+      - "dbname"
+    values:
+      - "dbsize"
+    query:  |
+            SELECT datname::text AS dbname, pg_database_size(datname)::float AS dbsize
+            FROM pg_database;

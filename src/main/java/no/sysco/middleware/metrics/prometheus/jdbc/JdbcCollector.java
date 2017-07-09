@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TreeMap;
 import java.util.logging.Logger;
 
@@ -79,9 +80,20 @@ public class JdbcCollector extends Collector implements Collector.Describable {
           job.name = (String) jobObject.get("name");
         }
         if (jobObject.containsKey("connections")) {
-          List<Object> connections = (List<Object>) jobObject.get("connections");
-          for (Object connObject : connections) {
-            job.connections.add((String) connObject);
+          List<Map<String, Object>> connections = (List<Map<String, Object>>) jobObject.get("connections");
+          for (Map<String, Object> connObject : connections) {
+            JdbcConnection connection = new JdbcConnection();
+            job.connections.add(connection);
+
+            if (connObject.containsKey("url")) {
+              connection.url = (String) connObject.get("url");
+            }
+            if (connObject.containsKey("username")) {
+              connection.username = (String) connObject.get("username");
+            }
+            if (connObject.containsKey("password")) {
+              connection.password = (String) connObject.get("password");
+            }
           }
         }
         if (jobObject.containsKey("queries")) {
@@ -153,13 +165,17 @@ public class JdbcCollector extends Collector implements Collector.Describable {
     try {
       List<MetricFamilySamples> mfsList1 = job.connections.stream().flatMap(connection -> {
         try {
-          Connection conn = DriverManager.getConnection(connection);
+          LOGGER.info(String.format("URL: %s", connection.url));
+          Properties properties = new Properties();
+          properties.put("user", connection.username);
+          properties.put("password", connection.password);
+          Connection conn = DriverManager.getConnection(connection.url, connection.username, connection.password);
           conns.add(conn);
           return job.queries.stream().flatMap(query -> {
             if (query.query != null) {
               try {
-                Statement statement = conn.createStatement();
-                ResultSet rs = statement.executeQuery(query.query);
+                PreparedStatement statement = conn.prepareStatement(query.query);
+                ResultSet rs = statement.executeQuery();
 
                 return getSamples(job.name, query, rs).stream();
               } catch (SQLException e) {
@@ -189,7 +205,7 @@ public class JdbcCollector extends Collector implements Collector.Describable {
         }
       }).collect(toList());
       mfsList.addAll(mfsList1);
-    } catch (Exception e){
+    } catch (Exception e) {
       error = 1;
     }
     conns.forEach(connection -> {
@@ -202,14 +218,14 @@ public class JdbcCollector extends Collector implements Collector.Describable {
     List<MetricFamilySamples.Sample> samples = new ArrayList<>();
     samples.add(new MetricFamilySamples.Sample(
         "jdbc_scrape_duration_seconds", new ArrayList<>(), new ArrayList<>(), (System.nanoTime() - start) / 1.0E9));
-    mfsList.add(new MetricFamilySamples("jdbc_scrape_duration_seconds", Type.GAUGE, "Time this JMX scrape took, in seconds.", samples));
+    mfsList.add(new MetricFamilySamples("jdbc_scrape_duration_seconds", Type.GAUGE, "Time this JDBC scrape took, in seconds.", samples));
 
     samples = new ArrayList<>();
     samples.add(new MetricFamilySamples.Sample(
         "jdbc_scrape_error", new ArrayList<>(), new ArrayList<>(), error));
     mfsList.add(new MetricFamilySamples("jdbc_scrape_error", Type.GAUGE, "Non-zero if this scrape failed.", samples));
 
-    return  mfsList;
+    return mfsList;
   }
 
   private List<MetricFamilySamples> getSamples(String jobName, Query query, ResultSet rs) throws SQLException {
@@ -273,9 +289,15 @@ public class JdbcCollector extends Collector implements Collector.Describable {
     long lastUpdate = 0L;
   }
 
+  static class JdbcConnection {
+    String url;
+    String username;
+    String password;
+  }
+
   static class Job {
     String name;
-    List<String> connections = new ArrayList<>();
+    List<JdbcConnection> connections = new ArrayList<>();
     List<Query> queries = new ArrayList<>();
   }
 
