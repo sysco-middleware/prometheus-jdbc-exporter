@@ -12,12 +12,10 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.TreeMap;
 import java.util.logging.Logger;
 
@@ -59,15 +57,6 @@ public class JdbcCollector extends Collector implements Collector.Describable {
 
     if (yamlConfig == null) {  // Yaml config empty, set config to empty map.
       yamlConfig = new HashMap<>();
-    }
-
-    if (yamlConfig.containsKey("interval")) {
-      try {
-        //String interval = (String) yamlConfig.get("interval");
-        //cfg.interval = Duration.parse(interval);
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid duration provided for interval", e);
-      }
     }
 
     if (yamlConfig.containsKey("jobs")) {
@@ -133,7 +122,8 @@ public class JdbcCollector extends Collector implements Collector.Describable {
     }
 
     if (yamlConfig.containsKey("queries")) {
-      TreeMap<String, Object> labels = new TreeMap<>((Map<String, Object>) yamlConfig.get("queries"));
+      TreeMap<String, Object> labels =
+          new TreeMap<>((Map<String, Object>) yamlConfig.get("queries"));
       for (Map.Entry<String, Object> entry : labels.entrySet()) {
         cfg.queries.put(entry.getKey(), (String) entry.getValue());
       }
@@ -158,53 +148,56 @@ public class JdbcCollector extends Collector implements Collector.Describable {
   }
 
   private List<MetricFamilySamples> runJob(Job job, Map<String, String> queries) {
-    long start = System.nanoTime();
     double error = 0;
     List<MetricFamilySamples> mfsList = new ArrayList<>();
     List<Connection> conns = new ArrayList<>();
+    long start = System.nanoTime();
     try {
-      List<MetricFamilySamples> mfsList1 = job.connections.stream().flatMap(connection -> {
-        try {
-          LOGGER.info(String.format("URL: %s", connection.url));
-          Properties properties = new Properties();
-          properties.put("user", connection.username);
-          properties.put("password", connection.password);
-          Connection conn = DriverManager.getConnection(connection.url, connection.username, connection.password);
-          conns.add(conn);
-          return job.queries.stream().flatMap(query -> {
-            if (query.query != null) {
-              try {
-                PreparedStatement statement = conn.prepareStatement(query.query);
-                ResultSet rs = statement.executeQuery();
-
-                return getSamples(job.name, query, rs).stream();
-              } catch (SQLException e) {
-                e.printStackTrace();
-                return null;
-              }
-            } else {
-              String q = queries.get(query.queryRef);
-              if (q != null) {
+      List<MetricFamilySamples> mfsListFromJobs =
+          job.connections.stream()
+              .flatMap(connection -> {
                 try {
-                  PreparedStatement statement = conn.prepareStatement(q);
-                  ResultSet rs = statement.executeQuery();
+                  LOGGER.info(String.format("URL: %s", connection.url));
+                  Connection conn =
+                      DriverManager.getConnection(
+                          connection.url, connection.username, connection.password);
+                  conns.add(conn);
+                  return
+                      job.queries.stream()
+                          .flatMap(query -> {
+                            if (query.query != null) {
+                              try {
+                                PreparedStatement statement = conn.prepareStatement(query.query);
+                                ResultSet rs = statement.executeQuery();
 
-                  return getSamples(job.name, query, rs).stream();
+                                return getSamples(job.name, query, rs).stream();
+                              } catch (SQLException e) {
+                                e.printStackTrace();
+                                return null;
+                              }
+                            } else {
+                              String q = queries.get(query.queryRef);
+                              if (q != null) {
+                                try {
+                                  PreparedStatement statement = conn.prepareStatement(q);
+                                  ResultSet rs = statement.executeQuery();
+
+                                  return getSamples(job.name, query, rs).stream();
+                                } catch (SQLException e) {
+                                  e.printStackTrace();
+                                  return null;
+                                }
+                              } else {
+                                return null;
+                              }
+                            }
+                          });
                 } catch (SQLException e) {
                   e.printStackTrace();
                   return null;
                 }
-              } else {
-                return null;
-              }
-            }
-          });
-        } catch (SQLException e) {
-          e.printStackTrace();
-          return null;
-        }
-      }).collect(toList());
-      mfsList.addAll(mfsList1);
+              }).collect(toList());
+      mfsList.addAll(mfsListFromJobs);
     } catch (Exception e) {
       error = 1;
     }
@@ -216,19 +209,38 @@ public class JdbcCollector extends Collector implements Collector.Describable {
       }
     });
     List<MetricFamilySamples.Sample> samples = new ArrayList<>();
-    samples.add(new MetricFamilySamples.Sample(
-        "jdbc_scrape_duration_seconds", new ArrayList<>(), new ArrayList<>(), (System.nanoTime() - start) / 1.0E9));
-    mfsList.add(new MetricFamilySamples("jdbc_scrape_duration_seconds", Type.GAUGE, "Time this JDBC scrape took, in seconds.", samples));
+    samples.add(
+        new MetricFamilySamples.Sample(
+            "jdbc_scrape_duration_seconds",
+            new ArrayList<>(),
+            new ArrayList<>(),
+            (System.nanoTime() - start) / 1.0E9));
+    mfsList.add(
+        new MetricFamilySamples(
+            "jdbc_scrape_duration_seconds",
+            Type.GAUGE,
+            "Time this JDBC scrape took, in seconds.",
+            samples));
 
     samples = new ArrayList<>();
-    samples.add(new MetricFamilySamples.Sample(
-        "jdbc_scrape_error", new ArrayList<>(), new ArrayList<>(), error));
-    mfsList.add(new MetricFamilySamples("jdbc_scrape_error", Type.GAUGE, "Non-zero if this scrape failed.", samples));
+    samples.add(
+        new MetricFamilySamples.Sample(
+            "jdbc_scrape_error",
+            new ArrayList<>(),
+            new ArrayList<>(),
+            error));
+    mfsList.add(
+        new MetricFamilySamples(
+            "jdbc_scrape_error",
+            Type.GAUGE,
+            "Non-zero if this scrape failed.",
+            samples));
 
     return mfsList;
   }
 
-  private List<MetricFamilySamples> getSamples(String jobName, Query query, ResultSet rs) throws SQLException {
+  private List<MetricFamilySamples> getSamples(String jobName, Query query, ResultSet rs)
+      throws SQLException {
     List<MetricFamilySamples> samplesList = new ArrayList<>();
 
     while (rs.next()) {
@@ -277,13 +289,22 @@ public class JdbcCollector extends Collector implements Collector.Describable {
 
   public List<MetricFamilySamples> describe() {
     List<MetricFamilySamples> sampleFamilies = new ArrayList<MetricFamilySamples>();
-    sampleFamilies.add(new MetricFamilySamples("jdbc_scrape_duration_seconds", Type.GAUGE, "Time this JDBC scrape took, in seconds.", new ArrayList<>()));
-    sampleFamilies.add(new MetricFamilySamples("jdbc_scrape_error", Type.GAUGE, "Non-zero if this scrape failed.", new ArrayList<>()));
+    sampleFamilies.add(
+        new MetricFamilySamples(
+            "jdbc_scrape_duration_seconds",
+            Type.GAUGE,
+            "Time this JDBC scrape took, in seconds.",
+            new ArrayList<>()));
+    sampleFamilies.add(
+        new MetricFamilySamples(
+            "jdbc_scrape_error",
+            Type.GAUGE,
+            "Non-zero if this scrape failed.",
+            new ArrayList<>()));
     return sampleFamilies;
   }
 
   static class Config {
-    //Duration interval = Duration.ofMinutes(1);
     List<Job> jobs = new ArrayList<>();
     Map<String, String> queries = new TreeMap<>();
     long lastUpdate = 0L;
