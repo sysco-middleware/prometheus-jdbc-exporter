@@ -1,4 +1,4 @@
-package no.sysco.middleware.metrics.prometheus.jdbc.prometheus.jdbc;
+package no.sysco.middleware.metrics.prometheus.jdbc;
 
 import io.prometheus.client.Collector;
 import io.prometheus.client.Counter;
@@ -13,13 +13,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.logging.Logger;
 
@@ -29,11 +26,11 @@ import static java.util.stream.Collectors.toList;
  * Prometheus JDBC Collector
  */
 public class JdbcCollector extends Collector implements Collector.Describable {
-  static final Counter configReloadSuccess = Counter.build()
+  private static final Counter configReloadSuccess = Counter.build()
       .name("jdbc_config_reload_success_total")
       .help("Number of times configuration have successfully been reloaded.").register();
 
-  static final Counter configReloadFailure = Counter.build()
+  private static final Counter configReloadFailure = Counter.build()
       .name("jdbc_config_reload_failure_total")
       .help("Number of times configuration have failed to be reloaded.").register();
 
@@ -65,8 +62,8 @@ public class JdbcCollector extends Collector implements Collector.Describable {
 
     if (yamlConfig.containsKey("interval")) {
       try {
-        String interval = (String) yamlConfig.get("interval");
-        cfg.interval = Duration.parse(interval);
+        //String interval = (String) yamlConfig.get("interval");
+        //cfg.interval = Duration.parse(interval);
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException("Invalid duration provided for interval", e);
       }
@@ -124,8 +121,8 @@ public class JdbcCollector extends Collector implements Collector.Describable {
     }
 
     if (yamlConfig.containsKey("queries")) {
-      TreeMap labels = new TreeMap((Map<String, Object>) yamlConfig.get("queries"));
-      for (Map.Entry<String, Object> entry : (Set<Map.Entry<String, Object>>) labels.entrySet()) {
+      TreeMap<String, Object> labels = new TreeMap<>((Map<String, Object>) yamlConfig.get("queries"));
+      for (Map.Entry<String, Object> entry : labels.entrySet()) {
         cfg.queries.put(entry.getKey(), (String) entry.getValue());
       }
     }
@@ -149,30 +146,20 @@ public class JdbcCollector extends Collector implements Collector.Describable {
   }
 
   private List<MetricFamilySamples> runJob(Job job, Map<String, String> queries) {
-    return job.connections.stream().flatMap(connection -> {
-      /*Properties connectionProps = new Properties();
-      connectionProps.put("user", connection.username);
-      connectionProps.put("password", connection.password);
-*/
-      try {
-        java.sql.Connection conn = DriverManager.getConnection(connection);
-        return job.queries.stream().flatMap(query -> {
-          if (query.query != null) {
-            try {
-              Statement statement = conn.createStatement();
-              ResultSet rs = statement.executeQuery(query.query);
-
-              return getSamples(job.name, query, rs).stream();
-            } catch (SQLException e) {
-              e.printStackTrace();
-              return null;
-            }
-          } else {
-            String q = queries.get(query.queryRef);
-            if (q != null) {
+    long start = System.nanoTime();
+    double error = 0;
+    List<MetricFamilySamples> mfsList = new ArrayList<>();
+    List<Connection> conns = new ArrayList<>();
+    try {
+      List<MetricFamilySamples> mfsList1 = job.connections.stream().flatMap(connection -> {
+        try {
+          Connection conn = DriverManager.getConnection(connection);
+          conns.add(conn);
+          return job.queries.stream().flatMap(query -> {
+            if (query.query != null) {
               try {
-                PreparedStatement statement = conn.prepareStatement(q);
-                ResultSet rs = statement.executeQuery();
+                Statement statement = conn.createStatement();
+                ResultSet rs = statement.executeQuery(query.query);
 
                 return getSamples(job.name, query, rs).stream();
               } catch (SQLException e) {
@@ -180,15 +167,49 @@ public class JdbcCollector extends Collector implements Collector.Describable {
                 return null;
               }
             } else {
-              return null;
+              String q = queries.get(query.queryRef);
+              if (q != null) {
+                try {
+                  PreparedStatement statement = conn.prepareStatement(q);
+                  ResultSet rs = statement.executeQuery();
+
+                  return getSamples(job.name, query, rs).stream();
+                } catch (SQLException e) {
+                  e.printStackTrace();
+                  return null;
+                }
+              } else {
+                return null;
+              }
             }
-          }
-        });
+          });
+        } catch (SQLException e) {
+          e.printStackTrace();
+          return null;
+        }
+      }).collect(toList());
+      mfsList.addAll(mfsList1);
+    } catch (Exception e){
+      error = 1;
+    }
+    conns.forEach(connection -> {
+      try {
+        connection.close();
       } catch (SQLException e) {
         e.printStackTrace();
-        return null;
       }
-    }).collect(toList());
+    });
+    List<MetricFamilySamples.Sample> samples = new ArrayList<>();
+    samples.add(new MetricFamilySamples.Sample(
+        "jdbc_scrape_duration_seconds", new ArrayList<>(), new ArrayList<>(), (System.nanoTime() - start) / 1.0E9));
+    mfsList.add(new MetricFamilySamples("jdbc_scrape_duration_seconds", Type.GAUGE, "Time this JMX scrape took, in seconds.", samples));
+
+    samples = new ArrayList<>();
+    samples.add(new MetricFamilySamples.Sample(
+        "jdbc_scrape_error", new ArrayList<>(), new ArrayList<>(), error));
+    mfsList.add(new MetricFamilySamples("jdbc_scrape_error", Type.GAUGE, "Non-zero if this scrape failed.", samples));
+
+    return  mfsList;
   }
 
   private List<MetricFamilySamples> getSamples(String jobName, Query query, ResultSet rs) throws SQLException {
@@ -214,7 +235,10 @@ public class JdbcCollector extends Collector implements Collector.Describable {
                   return null;
                 }
               })
-              .map(value -> new MetricFamilySamples.Sample(query.name, query.labels, labelValues, value))
+              .map(value -> {
+                final String name = String.format("sql_%s", query.name);
+                return new MetricFamilySamples.Sample(name, query.labels, labelValues, value);
+              })
               .collect(toList());
 
 
@@ -236,11 +260,14 @@ public class JdbcCollector extends Collector implements Collector.Describable {
   }
 
   public List<MetricFamilySamples> describe() {
-    return null;
+    List<MetricFamilySamples> sampleFamilies = new ArrayList<MetricFamilySamples>();
+    sampleFamilies.add(new MetricFamilySamples("jdbc_scrape_duration_seconds", Type.GAUGE, "Time this JDBC scrape took, in seconds.", new ArrayList<>()));
+    sampleFamilies.add(new MetricFamilySamples("jdbc_scrape_error", Type.GAUGE, "Non-zero if this scrape failed.", new ArrayList<>()));
+    return sampleFamilies;
   }
 
   static class Config {
-    Duration interval = Duration.ofMinutes(1);
+    //Duration interval = Duration.ofMinutes(1);
     List<Job> jobs = new ArrayList<>();
     Map<String, String> queries = new TreeMap<>();
     long lastUpdate = 0L;
