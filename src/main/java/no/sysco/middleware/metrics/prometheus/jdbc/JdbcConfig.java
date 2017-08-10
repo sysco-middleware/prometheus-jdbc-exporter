@@ -22,12 +22,16 @@ import static java.util.stream.Collectors.toList;
 class JdbcConfig {
   private static final Logger LOGGER = Logger.getLogger(JdbcConfig.class.getName());
 
-  List<Job> jobs = new ArrayList<>();
-  Map<String, String> queries = new TreeMap<>();
-  long lastUpdate = 0L;
+  private List<JdbcJob> jobs = new ArrayList<>();
+  private Map<String, String> queries = new TreeMap<>();
+  private long lastUpdate = 0L;
+
+  JdbcConfig(Map<String, Object> yamlConfig, long lastUpdate) {
+    this(yamlConfig);
+    this.lastUpdate = lastUpdate;
+  }
 
   JdbcConfig(Map<String, Object> yamlConfig) {
-
     if (yamlConfig == null) {  // Yaml config empty, set config to empty map.
       yamlConfig = new HashMap<>();
     }
@@ -35,7 +39,7 @@ class JdbcConfig {
     if (yamlConfig.containsKey("jobs")) {
       List<Map<String, Object>> jobList = (List<Map<String, Object>>) yamlConfig.get("jobs");
       for (Map<String, Object> jobObject : jobList) {
-        Job job = new Job();
+        JdbcJob job = new JdbcJob();
         jobs.add(job);
 
         if (jobObject.containsKey("name")) {
@@ -110,7 +114,7 @@ class JdbcConfig {
         .collect(toList());
   }
 
-  private List<Collector.MetricFamilySamples> runJob(JdbcConfig.Job job, Map<String, String> queries) {
+  private List<Collector.MetricFamilySamples> runJob(JdbcJob job, Map<String, String> queries) {
     double error = 0;
     List<Collector.MetricFamilySamples> mfsList = new ArrayList<>();
     List<Connection> conns = new ArrayList<>();
@@ -128,31 +132,23 @@ class JdbcConfig {
                   return
                       job.queries.stream()
                           .flatMap(query -> {
-                            if (query.query != null) {
-                              try {
-                                PreparedStatement statement = conn.prepareStatement(query.query);
-                                ResultSet rs = statement.executeQuery();
-
-                                return getSamples(job.name, query, rs).stream();
-                              } catch (SQLException e) {
-                                e.printStackTrace();
-                                return null;
-                              }
-                            } else {
+                            if (query.query == null) {
                               String q = queries.get(query.queryRef);
                               if (q != null) {
-                                try {
-                                  PreparedStatement statement = conn.prepareStatement(q);
-                                  ResultSet rs = statement.executeQuery();
-
-                                  return getSamples(job.name, query, rs).stream();
-                                } catch (SQLException e) {
-                                  e.printStackTrace();
-                                  return null;
-                                }
+                                query.query = q;
                               } else {
                                 return null;
                               }
+                            }
+
+                            try {
+                              PreparedStatement statement = conn.prepareStatement(query.query);
+                              ResultSet rs = statement.executeQuery();
+
+                              return getSamples(job.name, query, rs).stream();
+                            } catch (SQLException e) {
+                              e.printStackTrace();
+                              return null;
                             }
                           });
                 } catch (SQLException e) {
@@ -204,7 +200,6 @@ class JdbcConfig {
     return mfsList;
   }
 
-
   private List<Collector.MetricFamilySamples> getSamples(String jobName, JdbcConfig.Query query, ResultSet rs)
       throws SQLException {
     List<Collector.MetricFamilySamples> samplesList = new ArrayList<>();
@@ -241,19 +236,23 @@ class JdbcConfig {
     return samplesList;
   }
 
-  static class JdbcConnection {
+  long lastUpdate() {
+    return lastUpdate;
+  }
+
+  private static class JdbcConnection {
     String url;
     String username;
     String password;
   }
 
-  static class Job {
+  private static class JdbcJob {
     String name;
     List<JdbcConnection> connections = new ArrayList<>();
     List<Query> queries = new ArrayList<>();
   }
 
-  static class Query {
+  private static class Query {
     String name;
     String help;
     List<String> labels = new ArrayList<>();

@@ -31,8 +31,7 @@ public class JdbcCollector extends Collector implements Collector.Describable {
 
   JdbcCollector(File in) throws FileNotFoundException {
     configFile = in;
-    config = new JdbcConfig((Map<String, Object>) new Yaml().load(new FileReader(in)));
-    config.lastUpdate = configFile.lastModified();
+    config = new JdbcConfig((Map<String, Object>) new Yaml().load(new FileReader(in)), in.lastModified());
   }
 
   JdbcCollector(String yamlConfig) {
@@ -43,7 +42,7 @@ public class JdbcCollector extends Collector implements Collector.Describable {
   public List<MetricFamilySamples> collect() {
     if (configFile != null) {
       long mtime = configFile.lastModified();
-      if (mtime > config.lastUpdate) {
+      if (mtime > config.lastUpdate()) {
         LOGGER.fine("Configuration file changed, reloading...");
         reloadConfig();
       }
@@ -54,9 +53,7 @@ public class JdbcCollector extends Collector implements Collector.Describable {
 
   private void reloadConfig() {
     try (FileReader fr = new FileReader(configFile)) {
-      Map<String, Object> newYamlConfig = (Map<String, Object>) new Yaml().load(fr);
-      config = new JdbcConfig(newYamlConfig);
-      config.lastUpdate = configFile.lastModified();
+      config = new JdbcConfig((Map<String, Object>) new Yaml().load(fr), configFile.lastModified());
       configReloadSuccess.inc();
     } catch (Exception e) {
       LOGGER.severe("Configuration reload failed: " + e.toString());
