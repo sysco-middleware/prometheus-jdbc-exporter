@@ -195,7 +195,7 @@
             <id>release</id>
             <build>
                 <plugins>
-                    <plugin>
+                    <!-- plugin>
                         <artifactId>maven-gpg-plugin</artifactId>
                         <version>1.5</version>
                         <executions>
@@ -207,7 +207,7 @@
                                 </goals>
                             </execution>
                         </executions>
-                    </plugin>
+                    </plugin -->
                     <plugin>
                         <artifactId>maven-source-plugin</artifactId>
                         <version>3.0.1</version>
