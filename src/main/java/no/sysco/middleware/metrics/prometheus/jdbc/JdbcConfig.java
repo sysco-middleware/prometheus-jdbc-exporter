@@ -34,6 +34,7 @@ class JdbcConfig {
   JdbcConfig(Map<String, Object> yamlConfig) {
     if (yamlConfig == null) {  // Yaml config empty, set config to empty map.
       yamlConfig = new HashMap<>();
+      LOGGER.warning("JDBC Config file is empty.");
     }
 
     if (yamlConfig.containsKey("jobs")) {
@@ -44,7 +45,11 @@ class JdbcConfig {
 
         if (jobObject.containsKey("name")) {
           job.name = (String) jobObject.get("name");
+        } else {
+          LOGGER.severe("JDBC Job does not have a name defined. This value is required to name a metric.");
+          //TODO throw exception
         }
+
         if (jobObject.containsKey("connections")) {
           List<Map<String, Object>> connections = (List<Map<String, Object>>) jobObject.get("connections");
           for (Map<String, Object> connObject : connections) {
@@ -61,7 +66,11 @@ class JdbcConfig {
               connection.password = (String) connObject.get("password");
             }
           }
+        } else {
+          LOGGER.severe("JDBC Job does not have a connection defined. This value is required to execute collector.");
+          //TODO throw exception
         }
+
         if (jobObject.containsKey("queries")) {
           List<Map<String, Object>> queries = (List<Map<String, Object>>) jobObject.get("queries");
           for (Map<String, Object> queryObject : queries) {
@@ -93,9 +102,13 @@ class JdbcConfig {
               query.queryRef = (String) queryObject.get("query_ref");
             }
           }
+        } else {
+          LOGGER.severe("JDBC Job does not have queries defined. This value is required to execute collector.");
+          //TODO throw exception
         }
-        //TODO check validations
       }
+    } else {
+      LOGGER.warning("Config file does not have jobs defined. It will not collect any metric samples.");
     }
 
     if (yamlConfig.containsKey("queries")) {
@@ -105,7 +118,6 @@ class JdbcConfig {
         queries.put(entry.getKey(), (String) entry.getValue());
       }
     }
-
   }
 
   List<Collector.MetricFamilySamples> runJobs(){
@@ -225,7 +237,7 @@ class JdbcConfig {
                 }
               })
               .map(value -> {
-                final String name = String.format("sql_%s", query.name);
+                final String name = String.format("jdbc_%s", query.name);
                 return new Collector.MetricFamilySamples.Sample(name, query.labels, labelValues, value);
               })
               .collect(toList());
