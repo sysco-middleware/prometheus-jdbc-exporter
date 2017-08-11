@@ -52,7 +52,9 @@ class JdbcConfig {
     if (yamlConfig.containsKey("jobs")) {
       final List<Map<String, Object>> jobList =
           Optional.ofNullable((List<Map<String, Object>>) yamlConfig.get("jobs"))
-              .orElseThrow(() -> new IllegalArgumentException("JDBC Config file does not have `jobs` defined. It will not collect any metric samples."));
+              .orElseThrow(() ->
+                  new IllegalArgumentException("JDBC Config file does not have `jobs` defined. " +
+                      "It will not collect any metric samples."));
 
       for (Map<String, Object> jobObject : jobList) {
         JdbcJob job = new JdbcJob();
@@ -61,13 +63,16 @@ class JdbcConfig {
         if (jobObject.containsKey("name")) {
           job.name = (String) jobObject.get("name");
         } else {
-          throw new IllegalArgumentException("JDBC Job does not have a `name` defined. This value is required to execute collector.");
+          throw new IllegalArgumentException("JDBC Job does not have a `name` defined. " +
+              "This value is required to execute collector.");
         }
 
         if (jobObject.containsKey("connections")) {
           final List<Map<String, Object>> connections =
               Optional.ofNullable((List<Map<String, Object>>) jobObject.get("connections"))
-                  .orElseThrow(() -> new IllegalArgumentException("JDBC Job does not have `connections` defined. This value is required to execute collector."));
+                  .orElseThrow(() ->
+                      new IllegalArgumentException("JDBC Job does not have `connections` defined. " +
+                          "This value is required to execute collector."));
 
           for (Map<String, Object> connObject : connections) {
             JdbcConnection connection = new JdbcConnection();
@@ -76,29 +81,35 @@ class JdbcConfig {
             if (connObject.containsKey("url")) {
               connection.url = (String) connObject.get("url");
             } else {
-              throw new IllegalArgumentException("JDBC Connection `url` is not defined. This value is required to execute collector.");
+              throw new IllegalArgumentException("JDBC Connection `url` is not defined. " +
+                  "This value is required to execute collector.");
             }
 
             if (connObject.containsKey("username")) {
               connection.username = (String) connObject.get("username");
             } else {
-              throw new IllegalArgumentException("JDBC Connection `username` is not defined. This value is required to execute collector.");
+              throw new IllegalArgumentException("JDBC Connection `username` is not defined. " +
+                  "This value is required to execute collector.");
             }
 
             if (connObject.containsKey("password")) {
               connection.password = (String) connObject.get("password");
             } else {
-              throw new IllegalArgumentException("JDBC Connection `password` is not defined. This value is required to execute collector.");
+              throw new IllegalArgumentException("JDBC Connection `password` is not defined. " +
+                  "This value is required to execute collector.");
             }
           }
         } else {
-          throw new IllegalArgumentException("JDBC Job does not have a `connections` defined. This value is required to execute collector.");
+          throw new IllegalArgumentException("JDBC Job does not have a `connections` defined. " +
+              "This value is required to execute collector.");
         }
 
         if (jobObject.containsKey("queries")) {
           final List<Map<String, Object>> queriesList =
               Optional.ofNullable((List<Map<String, Object>>) jobObject.get("queries"))
-                  .orElseThrow(() -> new IllegalArgumentException("JDBC Job does not have `queries` defined. This value is required to execute collector."));
+                  .orElseThrow(() ->
+                      new IllegalArgumentException("JDBC Job does not have `queries` defined. " +
+                          "This value is required to execute collector."));
 
           for (Map<String, Object> queryObject : queriesList) {
             Query query = new Query();
@@ -107,7 +118,8 @@ class JdbcConfig {
             if (queryObject.containsKey("name")) {
               query.name = (String) queryObject.get("name");
             } else {
-              throw new IllegalArgumentException("JDBC Query does not have a `name` defined. This value is required to execute collector.");
+              throw new IllegalArgumentException("JDBC Query does not have a `name` defined. " +
+                  "This value is required to execute collector.");
             }
 
             if (queryObject.containsKey("help")) {
@@ -127,13 +139,16 @@ class JdbcConfig {
             if (queryObject.containsKey("values")) {
               final List<Object> values =
                   Optional.ofNullable((List<Object>) queryObject.get("values"))
-                      .orElseThrow(() -> new IllegalArgumentException("JDBC Query does not have `values` defined. This value is required to execute collector."));
+                      .orElseThrow(() ->
+                          new IllegalArgumentException("JDBC Query does not have `values` defined. " +
+                              "This value is required to execute collector."));
 
               for (Object value : values) {
                 query.values.add((String) value);
               }
             } else {
-              throw new IllegalArgumentException("JDBC Query does not have `values` defined. This value is required to execute collector.");
+              throw new IllegalArgumentException("JDBC Query does not have `values` defined. " +
+                  "This value is required to execute collector.");
             }
 
             if (queryObject.containsKey("query") && queryObject.containsKey("query_ref")) {
@@ -154,20 +169,23 @@ class JdbcConfig {
             }
           }
         } else {
-          throw new IllegalArgumentException("JDBC Job does not have `queries` defined. This value is required to execute collector.");
+          throw new IllegalArgumentException("JDBC Job does not have `queries` defined. " +
+              "This value is required to execute collector.");
         }
       }
     } else {
-      throw new IllegalArgumentException("JDBC Config file does not have jobs defined. It will not collect any metric samples.");
+      throw new IllegalArgumentException("JDBC Config file does not have jobs defined. " +
+          "It will not collect any metric samples.");
     }
 
 
   }
 
   List<Collector.MetricFamilySamples> runJobs() {
-    return jobs.stream()
-        .flatMap(job -> runJob(job).stream())
-        .collect(toList());
+    return
+        jobs.stream()
+            .flatMap(job -> runJob(job).stream())
+            .collect(toList());
   }
 
   private List<Collector.MetricFamilySamples> runJob(JdbcJob job) {
@@ -193,7 +211,8 @@ class JdbcConfig {
                   connections.add(conn);
 
                   return
-                      job.queries.stream()
+                      job.queries
+                          .stream()
                           .flatMap(query -> {
                             try {
                               PreparedStatement statement = conn.prepareStatement(query.query);
@@ -209,7 +228,9 @@ class JdbcConfig {
                   LOGGER.log(Level.SEVERE, "Error connecting to database", e);
                   return Stream.empty();
                 }
-              }).collect(toList());
+              })
+              .collect(toList());
+
       mfsList.addAll(mfsListFromJobs);
     } catch (Exception e) {
       error = 1;
@@ -219,7 +240,7 @@ class JdbcConfig {
       try {
         connection.close();
       } catch (SQLException e) {
-        e.printStackTrace();
+        LOGGER.log(Level.WARNING, "Error closing connection.", e);
       }
     });
 
@@ -268,7 +289,9 @@ class JdbcConfig {
                 try {
                   return rs.getString(label);
                 } catch (SQLException e) {
-                  LOGGER.log(Level.WARNING, String.format("Label %s not found as part of the query result set.", label));
+                  LOGGER.log(
+                      Level.WARNING,
+                      String.format("Label %s not found as part of the query result set.", label));
                   return "";
                 }
               }).collect(toList());
@@ -279,17 +302,22 @@ class JdbcConfig {
                 try {
                   return rs.getFloat(value);
                 } catch (SQLException e) {
-                  LOGGER.log(Level.SEVERE, String.format("Sample value %s not found as part of the query result set.", value));
+                  LOGGER.log(
+                      Level.SEVERE,
+                      String.format("Sample value %s not found as part of the query result set.", value),
+                      e);
                   return null;
                 }
               })
               .map(value -> {
                 final String name = String.format("jdbc_%s", query.name);
-                return new Collector.MetricFamilySamples.Sample(name, query.labels, labelValues, value);
+                return
+                    new Collector.MetricFamilySamples.Sample(name, query.labels, labelValues, value);
               })
               .collect(toList());
 
-      samplesList.add(new Collector.MetricFamilySamples(jobName, Collector.Type.GAUGE, query.help, samples));
+      samplesList.add(
+          new Collector.MetricFamilySamples(jobName, Collector.Type.GAUGE, query.help, samples));
     }
 
     return samplesList;
