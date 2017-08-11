@@ -38,7 +38,69 @@ This query will create a metric `sql_db_users`, where *sql_* is the exporter pre
 
 This is a list of all possible options:
 
-//TODO
+**1. jobs**
+
+Represents a list of jobs that will be executed by the collector.
+
+Values:
+
+*name*: Name of the `job`. Required.
+
+*connections*: List of connection details. At least one.
+
+*queries*: List of queries to execute. At least one.
+
+
+```yaml
+jobs:
+  - name: "job1"
+    connections: ...
+    queries: ...
+```
+
+**1.1. connection**
+
+Represents connection details to connect to a database instance and
+execute queries.
+
+Values:
+
+*url*: JDBC URL to connect to database instances. Required.
+
+*username*: database user's name. Required.
+
+*password*: database user's password. Required.
+
+
+**1.2. query**
+
+Represents query definition to collect metrics from database.
+
+Values:
+
+*name*: Query name, that will be part of the metric name: `jdbc_<query_name>`. Required.
+
+*help*: Query description, that will be used as metric description also. Optional.
+
+*values*: List of values, that has to match a column value, that must be `float`. At least one.
+
+*query*: SQL query to select rows that will represent a metric sample.
+
+*query_ref*: Reference to common queries shared between jobs.
+
+`query` and `query_ref` are mutually exclusive. At least one of those has to be defined.
+
+**2. queries**
+
+Represents common queries that can be referenced from different `jobs`.
+
+```yaml
+queries:
+  query1: |
+    SELECT count(1) "COUNT" FROM users
+```
+
+Where `query1` is the key that will be used from `query` definition.
 
 ## Examples
 
