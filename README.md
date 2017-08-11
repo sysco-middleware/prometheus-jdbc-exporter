@@ -50,7 +50,6 @@ Values:
 
 *queries*: List of queries to execute. At least one.
 
-
 ```yaml
 jobs:
   - name: "job1"
@@ -71,6 +70,12 @@ Values:
 
 *password*: database user's password. Required.
 
+```yaml
+connections:
+  - url: 'jdbc:oracle:thin:@db:1521/ORCLPDB1'
+    username: 'system'
+    password: 'welcome1'
+```
 
 **1.2. query**
 
@@ -89,6 +94,27 @@ Values:
 *query_ref*: Reference to common queries shared between jobs.
 
 `query` and `query_ref` are mutually exclusive. At least one of those has to be defined.
+
+```yaml
+  queries:
+  - name: "db_users"
+    help: "Database Users"
+    values:
+      - "count"
+    query:  |
+            select count(1) count from dba_users
+```
+
+or with `query_ref`
+
+```yaml
+  queries:
+  - name: "db_users"
+    help: "Database Users"
+    values:
+      - "count"
+    query_ref: "query1"
+```
 
 **2. queries**
 
