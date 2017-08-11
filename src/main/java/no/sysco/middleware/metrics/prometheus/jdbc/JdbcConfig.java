@@ -12,7 +12,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
 
@@ -23,7 +25,6 @@ class JdbcConfig {
   private static final Logger LOGGER = Logger.getLogger(JdbcConfig.class.getName());
 
   private List<JdbcJob> jobs = new ArrayList<>();
-  private Map<String, String> queries = new TreeMap<>();
   private long lastUpdate = 0L;
 
   JdbcConfig(Map<String, Object> yamlConfig, long lastUpdate) {
@@ -37,6 +38,15 @@ class JdbcConfig {
       LOGGER.warning("JDBC Config file is empty.");
     }
 
+    Map<String, String> queries = new TreeMap<>();
+    if (yamlConfig.containsKey("queries")) {
+      TreeMap<String, Object> labels =
+          new TreeMap<>((Map<String, Object>) yamlConfig.get("queries"));
+      for (Map.Entry<String, Object> entry : labels.entrySet()) {
+        queries.put(entry.getKey(), (String) entry.getValue());
+      }
+    }
+
     if (yamlConfig.containsKey("jobs")) {
       List<Map<String, Object>> jobList = (List<Map<String, Object>>) yamlConfig.get("jobs");
       for (Map<String, Object> jobObject : jobList) {
@@ -46,8 +56,7 @@ class JdbcConfig {
         if (jobObject.containsKey("name")) {
           job.name = (String) jobObject.get("name");
         } else {
-          LOGGER.severe("JDBC Job does not have a name defined. This value is required to name a metric.");
-          //TODO throw exception
+          throw new IllegalArgumentException("JDBC Job does not have a name defined. This value is required to name a metric.");
         }
 
         if (jobObject.containsKey("connections")) {
@@ -67,13 +76,12 @@ class JdbcConfig {
             }
           }
         } else {
-          LOGGER.severe("JDBC Job does not have a connection defined. This value is required to execute collector.");
-          //TODO throw exception
+          throw new IllegalArgumentException("JDBC Job does not have a connection defined. This value is required to execute collector.");
         }
 
         if (jobObject.containsKey("queries")) {
-          List<Map<String, Object>> queries = (List<Map<String, Object>>) jobObject.get("queries");
-          for (Map<String, Object> queryObject : queries) {
+          List<Map<String, Object>> qs = (List<Map<String, Object>>) jobObject.get("queries");
+          for (Map<String, Object> queryObject : qs) {
             Query query = new Query();
             job.queries.add(query);
 
@@ -95,77 +103,77 @@ class JdbcConfig {
                 query.values.add((String) value);
               }
             }
+
+            if (queryObject.containsKey("query") && queryObject.containsKey("query_ref")) {
+              throw new IllegalArgumentException("JDBC Query cannot have a `query` value and a `query_ref` at the same time.");
+            }
+
             if (queryObject.containsKey("query")) {
               query.query = (String) queryObject.get("query");
-            }
-            if (queryObject.containsKey("query_ref")) {
+            } else if (queryObject.containsKey("query_ref")) {
               query.queryRef = (String) queryObject.get("query_ref");
+              if (queries.containsKey(query.queryRef)) {
+                query.query = queries.get(query.queryRef);
+              } else {
+                throw new IllegalArgumentException("JDBC Query Reference does not exist as part of the JDBC Queries.");
+              }
+            } else {
+              throw new IllegalArgumentException("JDBC Query must have a `query` value OR a `query_ref` defined.");
             }
           }
         } else {
-          LOGGER.severe("JDBC Job does not have queries defined. This value is required to execute collector.");
-          //TODO throw exception
+          throw new IllegalArgumentException("JDBC Job does not have queries defined. This value is required to execute collector.");
         }
       }
     } else {
-      LOGGER.warning("Config file does not have jobs defined. It will not collect any metric samples.");
+      throw new IllegalArgumentException("JDBC Config file does not have jobs defined. It will not collect any metric samples.");
     }
 
-    if (yamlConfig.containsKey("queries")) {
-      TreeMap<String, Object> labels =
-          new TreeMap<>((Map<String, Object>) yamlConfig.get("queries"));
-      for (Map.Entry<String, Object> entry : labels.entrySet()) {
-        queries.put(entry.getKey(), (String) entry.getValue());
-      }
-    }
+
   }
 
-  List<Collector.MetricFamilySamples> runJobs(){
+  List<Collector.MetricFamilySamples> runJobs() {
     return jobs.stream()
-        .flatMap(job -> runJob(job, queries).stream())
+        .flatMap(job -> runJob(job).stream())
         .collect(toList());
   }
 
-  private List<Collector.MetricFamilySamples> runJob(JdbcJob job, Map<String, String> queries) {
+  private List<Collector.MetricFamilySamples> runJob(JdbcJob job) {
     double error = 0;
     List<Collector.MetricFamilySamples> mfsList = new ArrayList<>();
-    List<Connection> conns = new ArrayList<>();
+    List<Connection> connections = new ArrayList<>();
     long start = System.nanoTime();
+
     try {
       List<Collector.MetricFamilySamples> mfsListFromJobs =
-          job.connections.stream()
+          job.connections
+              .stream()
               .flatMap(connection -> {
                 try {
-                  LOGGER.info(String.format("URL: %s", connection.url));
-                  Connection conn =
+                  LOGGER.info(String.format("JDBC Connection URL: %s", connection.url));
+
+                  final Connection conn =
                       DriverManager.getConnection(
                           connection.url, connection.username, connection.password);
-                  conns.add(conn);
+
+                  connections.add(conn);
+
                   return
                       job.queries.stream()
                           .flatMap(query -> {
-                            if (query.query == null) {
-                              String q = queries.get(query.queryRef);
-                              if (q != null) {
-                                query.query = q;
-                              } else {
-                                return null;
-                              }
-                            }
-
                             try {
                               PreparedStatement statement = conn.prepareStatement(query.query);
                               ResultSet rs = statement.executeQuery();
 
                               return getSamples(job.name, query, rs).stream();
                             } catch (SQLException e) {
-                              e.printStackTrace();
-                              return null;
+                              LOGGER.log(Level.SEVERE, String.format("Error executing query: %s", query.query), e);
+                              return Stream.empty();
                             }
                           });
                 } catch (SQLException e) {
-                  e.printStackTrace();
-                  return null;
+                  LOGGER.log(Level.SEVERE, "Error connecting to database", e);
+                  return Stream.empty();
                 }
               }).collect(toList());
       mfsList.addAll(mfsListFromJobs);
@@ -173,7 +181,7 @@ class JdbcConfig {
       error = 1;
     }
 
-    conns.forEach(connection -> {
+    connections.forEach(connection -> {
       try {
         connection.close();
       } catch (SQLException e) {
@@ -212,19 +220,24 @@ class JdbcConfig {
     return mfsList;
   }
 
-  private List<Collector.MetricFamilySamples> getSamples(String jobName, JdbcConfig.Query query, ResultSet rs)
+  private List<Collector.MetricFamilySamples> getSamples(String jobName,
+                                                         JdbcConfig.Query query,
+                                                         ResultSet rs)
       throws SQLException {
     List<Collector.MetricFamilySamples> samplesList = new ArrayList<>();
 
     while (rs.next()) {
-      List<String> labelValues = query.labels.stream().map(label -> {
-        try {
-          return rs.getString(label);
-        } catch (SQLException e) {
-          e.printStackTrace();
-          return "";
-        }
-      }).collect(toList());
+      List<String> labelValues =
+          query.labels
+              .stream()
+              .map(label -> {
+                try {
+                  return rs.getString(label);
+                } catch (SQLException e) {
+                  LOGGER.log(Level.WARNING, String.format("Label %s not found as part of the query result set.", label));
+                  return "";
+                }
+              }).collect(toList());
 
       List<Collector.MetricFamilySamples.Sample> samples =
           query.values.stream()
@@ -232,7 +245,7 @@ class JdbcConfig {
                 try {
                   return rs.getFloat(value);
                 } catch (SQLException e) {
-                  e.printStackTrace();
+                  LOGGER.log(Level.SEVERE, String.format("Sample value %s not found as part of the query result set.", value));
                   return null;
                 }
               })
@@ -242,9 +255,9 @@ class JdbcConfig {
               })
               .collect(toList());
 
-
       samplesList.add(new Collector.MetricFamilySamples(jobName, Collector.Type.GAUGE, query.help, samples));
     }
+
     return samplesList;
   }
 
