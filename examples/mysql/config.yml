@@ -2,13 +2,13 @@
 jobs:
 - name: "global"
   connections:
-  - url: 'jdbc:oracle:thin:@db:1521/ORCLPDB1'
-    username: 'system'
-    password: '2TdaePMgiRs=1'
+  - url: 'jdbc:mysql://db/mysql'
+    username: 'root'
+    password: 'example'
   queries:
   - name: "db_users"
     help: "Database Users"
     values:
       - "count"
     query:  |
-            select count(1) count from dba_users
+            SELECT count(User) count FROM mysql.user

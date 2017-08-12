@@ -6,9 +6,8 @@ services:
       - 9090:9090
   exporter:
     build: .
-    ports:
-      - 5555:5555
   db:
-    image: oracle/database:12.2.0.1-ee
-    ports:
-      - 1521:1521
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: test
