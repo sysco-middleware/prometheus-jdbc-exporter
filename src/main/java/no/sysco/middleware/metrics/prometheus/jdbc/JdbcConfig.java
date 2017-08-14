@@ -311,10 +311,7 @@ class JdbcConfig {
                   return null;
                 }
               })
-              .map(value -> {
-                return
-                    new Collector.MetricFamilySamples.Sample(queryName, query.labels, labelValues, value);
-              })
+              .map(value -> new Collector.MetricFamilySamples.Sample(queryName, query.labels, labelValues, value))
               .collect(toList());
 
       samplesList.add(
