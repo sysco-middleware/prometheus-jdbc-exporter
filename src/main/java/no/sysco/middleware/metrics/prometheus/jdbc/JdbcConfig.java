@@ -217,8 +217,7 @@ class JdbcConfig {
                             try {
                               PreparedStatement statement = conn.prepareStatement(query.query);
                               ResultSet rs = statement.executeQuery();
-
-                              return getSamples(job.name, query, rs).stream();
+                              return getSamples(query, rs).stream();
                             } catch (SQLException e) {
                               LOGGER.log(Level.SEVERE, String.format("Error executing query: %s", query.query), e);
                               return Stream.empty();
@@ -275,12 +274,12 @@ class JdbcConfig {
     return mfsList;
   }
 
-  private List<Collector.MetricFamilySamples> getSamples(String jobName,
-                                                         JdbcConfig.Query query,
+  private List<Collector.MetricFamilySamples> getSamples(JdbcConfig.Query query,
                                                          ResultSet rs)
       throws SQLException {
-    List<Collector.MetricFamilySamples> samplesList = new ArrayList<>();
+    List<Collector.MetricFamilySamples.Sample> samples = new ArrayList<>();
 
+    final String queryName = String.format("jdbc_%s", query.name);
     while (rs.next()) {
       List<String> labelValues =
           query.labels
@@ -296,9 +295,7 @@ class JdbcConfig {
                 }
               }).collect(toList());
 
-      final String queryName = String.format("jdbc_%s", query.name);
-
-      List<Collector.MetricFamilySamples.Sample> samples =
+      List<Collector.MetricFamilySamples.Sample> sample =
           query.values.stream()
               .map(value -> {
                 try {
@@ -314,10 +311,12 @@ class JdbcConfig {
               .map(value -> new Collector.MetricFamilySamples.Sample(queryName, query.labels, labelValues, value))
               .collect(toList());
 
-      samplesList.add(
-          new Collector.MetricFamilySamples(queryName, Collector.Type.GAUGE, query.help, samples));
+      samples.addAll(sample);
     }
 
+    List<Collector.MetricFamilySamples> samplesList = new ArrayList<>();
+    samplesList.add(
+        new Collector.MetricFamilySamples(queryName, Collector.Type.GAUGE, query.help, samples));
     return samplesList;
   }
 
