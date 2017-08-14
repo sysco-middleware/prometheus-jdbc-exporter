@@ -296,6 +296,8 @@ class JdbcConfig {
                 }
               }).collect(toList());
 
+      final String queryName = String.format("jdbc_%s", query.name);
+
       List<Collector.MetricFamilySamples.Sample> samples =
           query.values.stream()
               .map(value -> {
@@ -310,14 +312,13 @@ class JdbcConfig {
                 }
               })
               .map(value -> {
-                final String name = String.format("jdbc_%s", query.name);
                 return
-                    new Collector.MetricFamilySamples.Sample(name, query.labels, labelValues, value);
+                    new Collector.MetricFamilySamples.Sample(queryName, query.labels, labelValues, value);
               })
               .collect(toList());
 
       samplesList.add(
-          new Collector.MetricFamilySamples(jobName, Collector.Type.GAUGE, query.help, samples));
+          new Collector.MetricFamilySamples(queryName, Collector.Type.GAUGE, query.help, samples));
     }
 
     return samplesList;

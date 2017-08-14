@@ -10,5 +10,7 @@ jobs:
     help: "Database Users"
     values:
       - "count"
+    labels:
+      - "usename"
     query:  |
-            select count(1) count from pg_catalog.pg_user
+            select count(1) count, usename from pg_catalog.pg_user group by usename
