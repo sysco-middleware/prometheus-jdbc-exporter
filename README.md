@@ -6,7 +6,7 @@ It uses JDBC libraries to execute a SQL query that returns a `Float` result and 
 
 ## Getting Started
 
-A YAML configuration file is required. 
+A YAML configuration file or directory with multiple YAML configuration files is required. 
 
 Here is a sample:
 
@@ -33,6 +33,19 @@ The first important part here is the `connections` object. It has the JDBC URL, 
 These are used to create connections to execute the queries defined inside the Job.
 
 This query will create a metric `sql_db_users`, where *sql_* is the exporter prefix.
+
+## Startup
+
+Startup syntax is 
+```
+java -Djava.security.egd=file:///dev/urandom \ 
+    -cp "." \ 
+    no.sysco.middleware.metrics.prometheus.jdbc.WebServer \ 
+    <[ip:]port> \ 
+    <configFileOrDirectory>
+```                     
+
+configFileOrDirectory can point to a directory with at least one valid yaml file or directly a valid one yaml file.
 
 ## Configuration
 

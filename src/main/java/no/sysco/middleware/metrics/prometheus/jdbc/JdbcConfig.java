@@ -26,12 +26,6 @@ class JdbcConfig {
   private static final Logger LOGGER = Logger.getLogger(JdbcConfig.class.getName());
 
   private List<JdbcJob> jobs = new ArrayList<>();
-  private long lastUpdate = 0L;
-
-  JdbcConfig(Map<String, Object> yamlConfig, long lastUpdate) {
-    this(yamlConfig);
-    this.lastUpdate = lastUpdate;
-  }
 
   JdbcConfig(Map<String, Object> yamlConfig) {
     if (yamlConfig == null) {  // Yaml config empty, set config to empty map.
@@ -318,10 +312,6 @@ class JdbcConfig {
     samplesList.add(
         new Collector.MetricFamilySamples(queryName, Collector.Type.GAUGE, query.help, samples));
     return samplesList;
-  }
-
-  long lastUpdate() {
-    return lastUpdate;
   }
 
   private static class JdbcConnection {
