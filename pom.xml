@@ -3,7 +3,7 @@
 
     <groupId>no.sysco.middleware.metrics</groupId>
     <artifactId>prometheus-jdbc-exporter</artifactId>
-    <version>1.2-SNAPSHOT</version>
+    <version>master-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>prometheus-jdbc-exporter</name>
@@ -17,9 +17,9 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:git@github.com:sysco-middleware/prometheus-jdbc-exporter.git</connection>
-        <developerConnection>scm:git:git@github.com:sysco-middleware/prometheus-jdbc-exporter.git</developerConnection>
-        <url>git@github.com:sysco-middleware/prometheus-jdbc-exporter.git</url>
+        <connection>scm:git:git@github.com:yieldlab/prometheus-jdbc-exporter.git</connection>
+        <developerConnection>scm:git:git@github.com:yieldlab/prometheus-jdbc-exporter.git</developerConnection>
+        <url>git@github.com:yieldlab/prometheus-jdbc-exporter.git</url>
         <tag>HEAD</tag>
     </scm>
 
@@ -114,7 +114,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <repository>syscomiddleware/prometheus-jdbc-exporter</repository>
+                    <repository>yieldlab/prometheus-jdbc-exporter</repository>
                     <tag>${project.version}</tag>
                 </configuration>
             </plugin>
