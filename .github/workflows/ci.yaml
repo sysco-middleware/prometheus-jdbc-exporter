@@ -52,7 +52,7 @@ jobs:
         password: ${{ github.token }}
         registry: docker.pkg.github.com
         repository: ${{ github.repository }}/prometheus-jdbc-exporter
-        tags: ${{ needs.CI.outputs.version }},latest
+        tags: ${{ needs.CI.outputs.version }}
     - name: Create Release
       uses: actions/create-release@v1
       env: 
