@@ -22,7 +22,7 @@ public class JdbcCollectorTest {
     public void testReloadConfig() {
         final URL resource = getClass().getClassLoader().getResource("config.yml");
         Optional.ofNullable(resource).map(URL::getFile).map(File::new).ifPresent(config -> {
-            JdbcCollector collector = new JdbcCollector(config);
+            JdbcCollector collector = new JdbcCollector(config, "jdbc");
             if (config.setLastModified(System.currentTimeMillis())) {
                 collector.reloadConfig();
             }
@@ -34,7 +34,7 @@ public class JdbcCollectorTest {
     public void testMultiFileConfig() {
         final URL resource = getClass().getClassLoader().getResource("multipleconfigs");
         Optional.ofNullable(resource).map(URL::getFile).map(File::new).ifPresent(config -> {
-            JdbcCollector collector = new JdbcCollector(config);
+            JdbcCollector collector = new JdbcCollector(config, "jdbc");
             if (config.setLastModified(System.currentTimeMillis())) {
                 collector.reloadConfig();
             }

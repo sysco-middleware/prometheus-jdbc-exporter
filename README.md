@@ -141,6 +141,11 @@ queries:
 
 Where `query1` is the key that will be used from `query` definition.
 
+## Override metric prefix
+
+The default `jdbc` prefix to all metrics can be overriden via the env variable METRIC_PREFIX and will prefix
+all metrics with `<METRIC_PREFIX>_`.
+
 ## Examples
 
 Go to the `examples` directory.

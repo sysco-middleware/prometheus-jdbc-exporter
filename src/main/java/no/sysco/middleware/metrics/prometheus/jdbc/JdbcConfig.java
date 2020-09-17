@@ -175,14 +175,14 @@ class JdbcConfig {
 
   }
 
-  List<Collector.MetricFamilySamples> runJobs() {
+  List<Collector.MetricFamilySamples> runJobs(String prefix) {
     return
         jobs.stream()
-            .flatMap(job -> runJob(job).stream())
+            .flatMap(job -> runJob(job, prefix).stream())
             .collect(toList());
   }
 
-  private List<Collector.MetricFamilySamples> runJob(JdbcJob job) {
+  private List<Collector.MetricFamilySamples> runJob(JdbcJob job, String prefix) {
     LOGGER.log(Level.INFO, "Running JDBC job: " + job.name);
 
     double error = 0;
@@ -211,7 +211,7 @@ class JdbcConfig {
                             try {
                               PreparedStatement statement = conn.prepareStatement(query.query);
                               ResultSet rs = statement.executeQuery();
-                              return getSamples(query, rs).stream();
+                              return getSamples(prefix, query, rs).stream();
                             } catch (SQLException e) {
                               LOGGER.log(Level.SEVERE, String.format("Error executing query: %s", query.query), e);
                               return Stream.empty();
@@ -240,13 +240,13 @@ class JdbcConfig {
     List<Collector.MetricFamilySamples.Sample> samples = new ArrayList<>();
     samples.add(
         new Collector.MetricFamilySamples.Sample(
-            "jdbc_scrape_duration_seconds",
+            prefix + "_scrape_duration_seconds",
             new ArrayList<>(),
             new ArrayList<>(),
             (System.nanoTime() - start) / 1.0E9));
     mfsList.add(
         new Collector.MetricFamilySamples(
-            "jdbc_scrape_duration_seconds",
+            prefix + "_scrape_duration_seconds",
             Collector.Type.GAUGE,
             "Time this JDBC scrape took, in seconds.",
             samples));
@@ -254,13 +254,13 @@ class JdbcConfig {
     samples = new ArrayList<>();
     samples.add(
         new Collector.MetricFamilySamples.Sample(
-            "jdbc_scrape_error",
+            prefix + "_scrape_error",
             new ArrayList<>(),
             new ArrayList<>(),
             error));
     mfsList.add(
         new Collector.MetricFamilySamples(
-            "jdbc_scrape_error",
+            prefix + "_scrape_error",
             Collector.Type.GAUGE,
             "Non-zero if this scrape failed.",
             samples));
@@ -268,12 +268,13 @@ class JdbcConfig {
     return mfsList;
   }
 
-  private List<Collector.MetricFamilySamples> getSamples(JdbcConfig.Query query,
+  private List<Collector.MetricFamilySamples> getSamples(String prefix,
+                                                         JdbcConfig.Query query,
                                                          ResultSet rs)
       throws SQLException {
     List<Collector.MetricFamilySamples.Sample> samples = new ArrayList<>();
 
-    final String queryName = String.format("jdbc_%s", query.name);
+    final String queryName = String.format("%s_%s", prefix, query.name);
     while (rs.next()) {
       List<String> labelValues =
           query.labels
