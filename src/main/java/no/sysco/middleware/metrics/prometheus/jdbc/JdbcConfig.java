@@ -279,7 +279,7 @@ class JdbcConfig {
       throws SQLException {
     List<Collector.MetricFamilySamples.Sample> samples = new ArrayList<>();
 
-    final String queryName = String.format("jdbc_%s", query.name);
+    final String queryName = String.format("%s", query.name);
     while (rs.next()) {
       List<String> labelValues =
           query.labels
