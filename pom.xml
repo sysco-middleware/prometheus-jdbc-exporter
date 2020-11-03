@@ -54,6 +54,11 @@
             <artifactId>junit</artifactId>
             <version>4.13</version>
         </dependency>
+        <dependency>
+            <groupId>net.snowflake</groupId>
+            <artifactId>snowflake-jdbc</artifactId>
+            <version>3.12.13</version>
+        </dependency>
     </dependencies>
 
 
