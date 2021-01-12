@@ -81,16 +81,10 @@ class JdbcConfig {
 
             if (connObject.containsKey("username")) {
               connection.username = (String) connObject.get("username");
-            } else {
-              throw new IllegalArgumentException("JDBC Connection `username` is not defined. " +
-                  "This value is required to execute collector.");
             }
 
             if (connObject.containsKey("password")) {
               connection.password = (String) connObject.get("password");
-            } else {
-              throw new IllegalArgumentException("JDBC Connection `password` is not defined. " +
-                  "This value is required to execute collector.");
             }
 
             if (connObject.containsKey("driver_class_name")) {

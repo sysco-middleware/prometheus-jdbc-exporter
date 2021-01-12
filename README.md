@@ -79,9 +79,9 @@ Values:
 
 *url*: JDBC URL to connect to database instances. Required.
 
-*username*: database user's name. Required.
+*username*: database user's name. Optional.
 
-*password*: database user's password. Required.
+*password*: database user's password. Optional.
 
 *driver_class_name*: Fully qualified name of the JDBC driver class. Optional.
 
