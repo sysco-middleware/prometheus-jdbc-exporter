@@ -100,6 +100,10 @@ Values:
 
 *help*: Query description, that will be used as metric description also. Optional.
 
+*static_labels*: Set of label names, and their static values. Optional.
+
+*labels*: List of labels, that has to match a column value, that must be `string`. Optional.
+
 *values*: List of values, that has to match a column value, that must be `float`. At least one.
 
 *query*: SQL query to select rows that will represent a metric sample.

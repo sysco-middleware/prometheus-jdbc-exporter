@@ -120,6 +120,14 @@ class JdbcConfig {
               query.help = (String) queryObject.get("help");
             }
 
+            if (queryObject.containsKey("static_labels")) {
+              final Map<String, Object> staticLabels = (Map<String, Object>) queryObject.get("static_labels");
+
+              for (Map.Entry<String, Object> staticLabel : staticLabels.entrySet()) {
+                query.staticLabels.put(staticLabel.getKey(), (String) staticLabel.getValue());
+              }
+            }
+
             if (queryObject.containsKey("labels")) {
               final List<Object> labels =
                   Optional.ofNullable((List<Object>) queryObject.get("labels"))
@@ -276,19 +284,25 @@ class JdbcConfig {
 
     final String queryName = String.format("%s_%s", prefix, query.name);
     while (rs.next()) {
-      List<String> labelValues =
-          query.labels
-              .stream()
-              .map(label -> {
-                try {
-                  return rs.getString(label);
-                } catch (SQLException e) {
-                  LOGGER.log(
-                      Level.WARNING,
-                      String.format("Label %s not found as part of the query result set.", label));
-                  return "";
-                }
-              }).collect(toList());
+      final List<String> labelNames = new ArrayList<>(query.labels);
+      final List<String> labelValues = new ArrayList<>();
+
+      for (String label : query.labels) {
+        try {
+          labelValues.add(rs.getString(label));
+        } catch (SQLException e) {
+          LOGGER.log(
+              Level.WARNING,
+              String.format("Label %s not found as part of the query result set.", label));
+
+          labelValues.add("");
+        }
+      }
+
+      for (Map.Entry<String, String> staticLabel : query.staticLabels.entrySet()) {
+        labelNames.add(staticLabel.getKey());
+        labelValues.add(staticLabel.getValue());
+      }
 
       List<Collector.MetricFamilySamples.Sample> sample =
           query.values.stream()
@@ -303,7 +317,7 @@ class JdbcConfig {
                   return null;
                 }
               })
-              .map(value -> new Collector.MetricFamilySamples.Sample(queryName, query.labels, labelValues, value))
+              .map(value -> new Collector.MetricFamilySamples.Sample(queryName, labelNames, labelValues, value))
               .collect(toList());
 
       samples.addAll(sample);
@@ -330,6 +344,7 @@ class JdbcConfig {
   private static class Query {
     String name;
     String help;
+    Map<String, String> staticLabels = new HashMap<>();
     List<String> labels = new ArrayList<>();
     List<String> values = new ArrayList<>();
     String query;
