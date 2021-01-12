@@ -83,6 +83,8 @@ Values:
 
 *password*: database user's password. Required.
 
+*driver_class_name*: Fully qualified name of the JDBC driver class. Optional.
+
 ```yaml
 connections:
   - url: 'jdbc:oracle:thin:@db:1521/ORCLPDB1'

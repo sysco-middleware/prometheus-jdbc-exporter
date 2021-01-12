@@ -92,6 +92,10 @@ class JdbcConfig {
               throw new IllegalArgumentException("JDBC Connection `password` is not defined. " +
                   "This value is required to execute collector.");
             }
+
+            if (connObject.containsKey("driver_class_name")) {
+              connection.driverClassName = (String) connObject.get("driver_class_name");
+            }
           }
         } else {
           throw new IllegalArgumentException("JDBC Job does not have a `connections` defined. " +
@@ -206,6 +210,10 @@ class JdbcConfig {
                 try {
                   LOGGER.info(String.format("JDBC Connection URL: %s", connection.url));
 
+                  if (connection.driverClassName != null) {
+                    Class.forName(connection.driverClassName);
+                  }
+
                   final Connection conn =
                       DriverManager.getConnection(
                           connection.url, connection.username, connection.password);
@@ -225,7 +233,7 @@ class JdbcConfig {
                               return Stream.empty();
                             }
                           });
-                } catch (SQLException e) {
+                } catch (SQLException | ClassNotFoundException e) {
                   LOGGER.log(Level.SEVERE, "Error connecting to database", e);
                   return Stream.empty();
                 }
@@ -333,6 +341,7 @@ class JdbcConfig {
     String url;
     String username;
     String password;
+    String driverClassName;
   }
 
   private static class JdbcJob {
