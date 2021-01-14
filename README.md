@@ -112,6 +112,8 @@ Values:
 
 *query_ref*: Reference to common queries shared between jobs.
 
+*cache_seconds*: How many seconds to cache query results until they are refreshed. Optional.
+
 `query` and `query_ref` are mutually exclusive. At least one of those has to be defined.
 
 ```yaml

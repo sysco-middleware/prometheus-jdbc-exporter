@@ -7,12 +7,14 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -26,6 +28,9 @@ class JdbcConfig {
   private static final Logger LOGGER = Logger.getLogger(JdbcConfig.class.getName());
 
   private List<JdbcJob> jobs = new ArrayList<>();
+  // <queryName, <expiration unixtimestamp in ms, previous samples>>
+  private Map<String, Map.Entry<Long, List<Collector.MetricFamilySamples>>> sampleCache = new ConcurrentHashMap<>();
+  private Clock clock = Clock.systemUTC();
 
   JdbcConfig(Map<String, Object> yamlConfig) {
     if (yamlConfig == null) {  // Yaml config empty, set config to empty map.
@@ -167,6 +172,17 @@ class JdbcConfig {
             } else {
               throw new IllegalArgumentException("JDBC Query must have a `query` value OR a `query_ref` defined.");
             }
+
+            if (queryObject.containsKey("cache_seconds")) {
+              try {
+                query.cacheSeconds = (Integer) queryObject.get("cache_seconds");
+                if (query.cacheSeconds < 0) {
+                  throw new IllegalArgumentException("cache_seconds must be positive");
+                }
+              } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("cache_seconds must be a valid number", e);
+              }
+            }
           }
         } else {
           throw new IllegalArgumentException("JDBC Job does not have `queries` defined. " +
@@ -183,7 +199,7 @@ class JdbcConfig {
 
   List<Collector.MetricFamilySamples> runJobs(String prefix) {
     return
-        jobs.stream()
+        jobs.parallelStream()
             .flatMap(job -> runJob(job, prefix).stream())
             .collect(toList());
   }
@@ -216,12 +232,19 @@ class JdbcConfig {
 
                   return
                       job.queries
-                          .stream()
+                          .parallelStream()
                           .flatMap(query -> {
+                            final String queryName = String.format("%s_%s", prefix, query.name);
+
+                            if(sampleCache.containsKey(queryName)
+                                    && sampleCache.get(queryName).getKey() > clock.millis()) {
+                              return sampleCache.get(queryName).getValue().stream();
+                            }
+
                             try {
                               PreparedStatement statement = conn.prepareStatement(query.query);
                               ResultSet rs = statement.executeQuery();
-                              return getSamples(prefix, query, rs).stream();
+                              return getSamples(queryName, query, rs).stream();
                             } catch (SQLException e) {
                               LOGGER.log(Level.SEVERE, String.format("Error executing query: %s", query.query), e);
                               return Stream.empty();
@@ -278,13 +301,12 @@ class JdbcConfig {
     return mfsList;
   }
 
-  private List<Collector.MetricFamilySamples> getSamples(String prefix,
+  private List<Collector.MetricFamilySamples> getSamples(String queryName,
                                                          JdbcConfig.Query query,
                                                          ResultSet rs)
       throws SQLException {
     List<Collector.MetricFamilySamples.Sample> samples = new ArrayList<>();
 
-    final String queryName = String.format("%s_%s", prefix, query.name);
     while (rs.next()) {
       final List<String> labelNames = new ArrayList<>(query.labels);
       final List<String> labelValues = new ArrayList<>();
@@ -328,6 +350,12 @@ class JdbcConfig {
     List<Collector.MetricFamilySamples> samplesList = new ArrayList<>();
     samplesList.add(
         new Collector.MetricFamilySamples(queryName, Collector.Type.GAUGE, query.help, samples));
+
+    if(query.cacheSeconds > 0) {
+      sampleCache.put(queryName,
+              new HashMap.SimpleImmutableEntry<>(clock.millis() + query.cacheSeconds * 1000L, samplesList));
+    }
+
     return samplesList;
   }
 
@@ -350,6 +378,7 @@ class JdbcConfig {
     Map<String, String> staticLabels = new HashMap<>();
     List<String> labels = new ArrayList<>();
     List<String> values = new ArrayList<>();
+    int cacheSeconds;
     String query;
     String queryRef;
   }

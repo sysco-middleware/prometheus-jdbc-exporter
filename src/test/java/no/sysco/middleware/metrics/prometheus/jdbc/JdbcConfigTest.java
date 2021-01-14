@@ -10,6 +10,7 @@ import static org.junit.Assert.*;
 /**
  *
  */
+@SuppressWarnings("unchecked")
 public class JdbcConfigTest {
 
   @Test(expected = IllegalArgumentException.class)
@@ -185,7 +186,6 @@ public class JdbcConfigTest {
     assertNotNull(config);
   }
 
-
   @Test
   public void testConfigShouldBuildWithoutQueryRef() {
     JdbcConfig config = new JdbcConfig((Map<String, Object>) new Yaml().load("---\n" +
@@ -202,6 +202,43 @@ public class JdbcConfigTest {
         "    query: abc\n" +
         ""));
     assertNotNull(config);
+  }
+
+  @Test
+  public void testConfigShouldBuildWithCacheSeconds() {
+    JdbcConfig config = new JdbcConfig((Map<String, Object>) new Yaml().load("---\n" +
+        "jobs:\n" +
+        "- name: \"global\"\n" +
+        "  connections:\n" +
+        "  - url: jdbc\n" +
+        "    username: sys\n" +
+        "    password: sys\n" +
+        "  queries:\n" +
+        "  - name: jdbc\n" +
+        "    cache_seconds: 180\n" +
+        "    values:\n" +
+        "    - v1\n" +
+        "    query: abc\n" +
+        ""));
+    assertNotNull(config);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testConfigShouldFailWithInvalidCacheSeconds() {
+    new JdbcConfig((Map<String, Object>) new Yaml().load("---\n" +
+        "jobs:\n" +
+        "- name: \"global\"\n" +
+        "  connections:\n" +
+        "  - url: jdbc\n" +
+        "    username: sys\n" +
+        "    password: sys\n" +
+        "  queries:\n" +
+        "  - name: jdbc\n" +
+        "    cache_seconds: -999\n" +
+        "    values:\n" +
+        "    - v1\n" +
+        "    query: abc\n" +
+        ""));
   }
 
 }
