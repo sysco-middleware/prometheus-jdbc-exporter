@@ -1,3 +1,4 @@
 ojdbc8.jar
 pom.xml.releaseBackup
 release.properties
+target/*
